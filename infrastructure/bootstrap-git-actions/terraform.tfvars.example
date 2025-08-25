@@ -1,13 +1,24 @@
-# # AWS admin credentials (so Terraform can create IAM user)
-# aws_admin_access_key = "AKIAxxxxxxxx"
-# aws_admin_secret_key = "xxxxxxxxxxxxxxxx"
-# aws_region           = "ca-central-1"
-
 # Docker
-docker_username = "mydockeruser"
-docker_password = "super-secret-password"
+docker_username = "massoudsaidi"
+docker_password = "CHANGE_ME_DOCKER_PASSWORD"
 
 # GitHub
-github_token = "ghp_xxxxxxxxxxxxx"
-github_owner = "my-github-org"
-github_repo  = "my-repository"
+github_token = "CHANGE_ME_GITHUB_TOKEN"
+github_owner = "MassoudSaidi"
+# github_repo  = "surrogateModel_1"   # use lowercase repo name
+github_repo  = "massoud_btap_1"   # use lowercase repo name
+
+# Deployment configuration values that tell GitHub Actions workflow which ECS resources to update.
+ecs_cluster_name = "btap-app4-dev-cluster"
+ecs_service_name = "btap-app4-dev-service"
+ecs_task_family = "btap-app4-dev-task"
+
+# Cognito configuration
+cognito_region = "ca-central-1"
+cognito_user_pool_id = "ca-central-1_jkcyFtg8t"
+cognito_app_client_id = "4osa36mkhu8f2f70gfao9kus1t"
+cognito_app_public_client_id = "407500nv5olochli5duupnv47a"   # For Swagger/Postman...
+cognito_app_client_secret = "a4vrk8lco6nuicgsbvjovu08d3ic14vaequf2tkh21ijauhsol3"
+cognito_domain = "https://btap-identity-dev-auth.auth.ca-central-1.amazoncognito.com"
+app_base_url = "http://btap-app4-dev-alb-1261227763.ca-central-1.elb.amazonaws.com"
+version_string = "v1.3.0"
