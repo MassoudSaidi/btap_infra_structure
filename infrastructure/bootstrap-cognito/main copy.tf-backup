@@ -1,0 +1,159 @@
+# Use variables for environment-specific values
+variable "app_name" {
+  description = "The name of the application."
+  type        = string
+  default     = "my-app"
+}
+
+variable "app_environment" {
+  description = "The environment for the deployment (e.g., 'dev', 'staging', 'prod')."
+  type        = string
+  default     = "dev"
+}
+
+variable "cognito_callback_urls" {
+  description = "A list of allowed callback URLs for the Cognito app client."
+  type        = list(string)
+  default     = ["http://localhost:8000/auth/callback"]
+}
+
+variable "cognito_logout_urls" {
+  description = "A list of allowed logout URLs for the Cognito app client."
+  type        = list(string)
+  default     = ["http://localhost:8000/logout"]
+}
+
+variable "cognito_public_callback_urls" {
+  description = "A list of allowed callback URLs for the Cognito public app."
+  type        = list(string)
+  default     = ["https://oauth.pstmn.io/v1/callback", "http://localhost:8000/docs/oauth2-redirect"]
+}
+
+variable "cognito_public_logout_urls" {
+  description = "A list of allowed logout URLs for the Cognito app client."
+  type        = list(string)
+  default     = ["http://localhost:8000/docs"]
+}
+
+
+# Create a unique domain name
+locals {
+  cognito_domain = "${var.app_name}-${var.app_environment}-auth"
+}
+
+resource "aws_cognito_user_pool" "main" {
+  name = "${var.app_name}-${var.app_environment}-user-pool"
+
+  # ... other attributes like password_policy ...
+
+  auto_verified_attributes = ["email"]
+  username_attributes      = ["email"]
+
+  # SECURITY: Enable MFA
+  mfa_configuration        = "OPTIONAL" # This stays the same
+
+  # FIX: Add this block to enable authenticator apps (TOTP)
+  software_token_mfa_configuration {
+    enabled = true
+  }
+
+  # OPTIONAL: You could also enable SMS as a second factor, but it requires more setup
+  # sms_configuration {
+  #   external_id    = "${var.app_name}-${var.app_environment}-sms"
+  #   sns_caller_arn = "arn:aws:iam::ACCOUNT_ID:role/CognitoSnsRole" # You must create this IAM role
+  # }
+
+  tags = {
+    Name        = "${var.app_name}-${var.app_environment}-user-pool"
+    Environment = var.app_environment
+  }
+}
+
+# A separate client for Swagger & Postman testing
+resource "aws_cognito_user_pool_client" "surrogate_public_client" {
+  name                             = "${var.app_name}-${var.app_environment}-public-client"
+  user_pool_id                     = aws_cognito_user_pool.main.id
+
+  generate_secret                  = false # << no secret
+  allowed_oauth_flows             = ["code", "implicit"]
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_scopes            = ["openid", "email", "profile"]
+  callback_urls                   = var.cognito_public_callback_urls
+  logout_urls                     = var.cognito_public_logout_urls
+  supported_identity_providers    = ["COGNITO"]
+
+  prevent_user_existence_errors   = "ENABLED"
+  # Enable explicit auth flows for direct user auth
+  explicit_auth_flows = [
+    "ALLOW_USER_PASSWORD_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH"
+  ]  
+}
+
+resource "aws_cognito_user_pool_client" "app" {
+  name         = "${var.app_name}-${var.app_environment}-client"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  generate_secret = true
+
+  # SECURITY: Avoid the 'implicit' flow
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  callback_urls                        = var.cognito_callback_urls
+  logout_urls                          = var.cognito_logout_urls
+  supported_identity_providers         = ["COGNITO"]
+
+  # SECURITY: Prevent user existence errors
+  prevent_user_existence_errors = "ENABLED"
+}
+
+resource "aws_cognito_user_pool_domain" "domain" {
+  domain       = local.cognito_domain
+  user_pool_id = aws_cognito_user_pool.main.id
+}
+
+resource "aws_cognito_user_group" "free_tier" {
+  name         = "Free-Tier"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Group for users on the free tier with basic rate limits."
+  precedence   = 100
+}
+
+resource "aws_cognito_user_group" "researcher_tier" {
+  name         = "Researcher-Tier"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Group for users on the Researcher tier with higher rate limits."
+  precedence   = 80
+}
+
+
+resource "aws_cognito_user_group" "developer_tier" {
+  name         = "Developer-Tier"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Group for users on the Developer tier with higher rate limits."
+  precedence   = 20
+}
+
+output "user_pool_id" {
+  value = aws_cognito_user_pool.main.id
+}
+
+output "client_id" {
+  value = aws_cognito_user_pool_client.app.id
+}
+
+output "public_client_id" {
+  value = aws_cognito_user_pool_client.surrogate_public_client.id
+}
+
+# FIX & SECURITY: Correctly reference the client secret and mark it as sensitive.
+output "client_secret" {
+  description = "The Client Secret for the Cognito App Client. This is a sensitive value."
+  value       = aws_cognito_user_pool_client.app.client_secret
+  sensitive   = true # This is CRITICAL for security.
+}
+
+output "domain" {
+  value = aws_cognito_user_pool_domain.domain.domain
+}

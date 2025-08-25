@@ -1,0 +1,13 @@
+# # AWS admin credentials (so Terraform can create IAM user)
+# aws_admin_access_key = "AKIAxxxxxxxx"
+# aws_admin_secret_key = "xxxxxxxxxxxxxxxx"
+# aws_region           = "ca-central-1"
+
+# Docker
+docker_username = "mydockeruser"
+docker_password = "super-secret-password"
+
+# GitHub
+github_token = "ghp_xxxxxxxxxxxxx"
+github_owner = "my-github-org"
+github_repo  = "my-repository"
