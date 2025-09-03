@@ -211,7 +211,7 @@ output "public_client_id" {
 output "client_secret" {
   description = "The Client Secret for the Cognito App Client. This is a sensitive value."
   value       = aws_cognito_user_pool_client.app.client_secret
-  sensitive   = true # This is CRITICAL for security.
+  # sensitive   = true # This is CRITICAL for security.
 }
 
 output "domain" {

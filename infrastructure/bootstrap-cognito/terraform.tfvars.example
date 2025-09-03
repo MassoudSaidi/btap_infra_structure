@@ -1,0 +1,19 @@
+app_name          = "my-app"
+app_environment   = "dev"
+
+cognito_callback_urls = [
+  "http://localhost:8000/auth/callback"
+]
+
+cognito_logout_urls = [
+  "http://localhost:8000/logout"
+]
+
+cognito_public_callback_urls = [
+  "https://oauth.pstmn.io/v1/callback",
+  "http://localhost:8000/docs/oauth2-redirect"
+]
+
+cognito_public_logout_urls = [
+  "http://localhost:8000/docs"
+]

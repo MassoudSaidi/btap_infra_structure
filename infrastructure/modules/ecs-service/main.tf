@@ -130,20 +130,17 @@ resource "aws_iam_instance_profile" "ecs_instance_profile" {
   role = aws_iam_role.ecs_instance_role.name
 }
 
-# 5. ECS Optimized AMI
-data "aws_ami" "ecs_ami" {
-  most_recent = true
-  owners      = ["amazon"]
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-ecs-hvm-*-x86_64-ebs"]
-  }
+# 5. ECS Optimized AMI (Using the stable Amazon Linux 2 SSM Parameter)
+# We are temporarily switching to the AL2 path because the latest AL2023 AMI appears to be broken.
+data "aws_ssm_parameter" "ecs_ami" {
+  name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id"
 }
 
 # 6. Launch Template and Auto Scaling Group
 resource "aws_launch_template" "ecs_launch_template" {
   name_prefix   = local.names.launch_template_prefix
-  image_id      = data.aws_ami.ecs_ami.id
+  image_id      = data.aws_ssm_parameter.ecs_ami.value
+  # image_id      = "ami-0030b5eb4495d8adc"
   instance_type = var.instance_type # Using the variable here
 
   iam_instance_profile {
@@ -272,13 +269,24 @@ resource "aws_elasticache_cluster" "redis" {
   security_group_ids   = [aws_security_group.redis_sg.id]
 }
 
+# 9. CLOUDWATCH LOG GROUP
+# Creates a centralized log group for our ECS service's containers.
+resource "aws_cloudwatch_log_group" "app_logs" {
+  name              = "/ecs/${local.names.service_name}"
+  retention_in_days = 30 # Keep logs for 30 days. Adjust as needed.
+
+  tags = {
+    Name = "${local.names.service_name}-logs"
+  }
+}
+
 # 10. ECS Task Definition
 resource "aws_ecs_task_definition" "app" {
   family                   = local.names.task_family
   network_mode             = "bridge"
   requires_compatibilities = ["EC2"]
-  cpu                      = "256"
-  memory                   = "2048"
+  cpu                      = tostring(var.task_cpu)   # Use the variable and convert to string
+  memory                   = tostring(var.task_memory) 
 
   container_definitions = jsonencode([
     {
@@ -291,6 +299,17 @@ resource "aws_ecs_task_definition" "app" {
         hostPort      = 8000
         protocol      = "tcp"
       }]
+      # --- CLOUDWATCH LOG GROUP ---
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.app_logs.name
+          "awslogs-region"        = var.aws_region # Assumes you have an aws_region variable
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+      # --- END ADD ---
+
       # --- ADD THIS ENVIRONMENT VARIABLE BLOCK ---
       environment = [
         {
@@ -309,6 +328,7 @@ resource "aws_ecs_task_definition" "app" {
   # This tells Terraform: "Do not try to change the container_definitions
   # even if the live version in AWS is different from the code."
   # Ignores definition revision made by CI/CD pipeline.
+  # --- TEMPORARILY COMMENT THIS OUT TO APPLY THE ANY IMPORTANT CHNAGES LIKE MEMORY CHANGE --- important when: terraform taint aws_ecs_task_definition.app
   lifecycle {
     ignore_changes = [
       container_definitions,
@@ -355,9 +375,155 @@ resource "aws_ecs_service" "app_service" {
   }  
 }
 
+# 12. CLOUDWATCH ALARMS
+
+# Alarm for high CPU utilization on the ECS Service
+resource "aws_cloudwatch_metric_alarm" "ecs_high_cpu" {
+  alarm_name          = "${local.names.service_name}-high-cpu"
+  alarm_description   = "This alarm triggers if the ECS service CPU utilization is above 80% for 5 minutes."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/ECS"
+  period              = "300" # 5 minutes
+  statistic           = "Average"
+  threshold           = "80"
+
+  dimensions = {
+    ClusterName = aws_ecs_cluster.main.name
+    ServiceName = aws_ecs_service.app_service.name
+  }
+
+  # In a real setup, you would add alarm_actions to an SNS topic ARN
+  # replace 123456789012 with your actual AWS account ID
+  # alarm_actions = ["arn:aws:sns:ca-central-1:123456789012:MyAlertsTopic"]
+}
+
+# 13. Alarm for a high number of 5xx errors from the ALB
+resource "aws_cloudwatch_metric_alarm" "alb_5xx_errors" {
+  alarm_name          = "${local.names.alb_name}-5xx-errors"
+  alarm_description   = "This alarm triggers if there are more than 10 5xx errors in a 5 minute period."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = "300"
+  statistic           = "Sum"
+  threshold           = "10"
+
+  dimensions = {
+    LoadBalancer = aws_lb.main.arn_suffix
+  }
+}
+
+# 14. Alarm for high memory utilization on the ECS Service
+resource "aws_cloudwatch_metric_alarm" "ecs_high_memory" {
+  alarm_name          = "${local.names.service_name}-high-memory"
+  alarm_description   = "This alarm triggers if the ECS service memory utilization is above 85% for 5 minutes."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "MemoryUtilization" # The key change is here
+  namespace           = "AWS/ECS"
+  period              = "300" # 5 minutes
+  statistic           = "Average"
+  threshold           = "85" # A good starting threshold for memory
+
+  dimensions = {
+    ClusterName = aws_ecs_cluster.main.name
+    ServiceName = aws_ecs_service.app_service.name
+  }
+
+  # In a real setup, you would add alarm_actions to an SNS topic ARN
+  # alarm_actions = ["arn:aws:sns:ca-central-1:123456789012:MyAlertsTopic"]
+}
+
+# 15. CLOUDWATCH DASHBOARD
+resource "aws_cloudwatch_dashboard" "main_dashboard" {
+  dashboard_name = "${local.base_name}-dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      # Widget 1: ECS CPU & Memory
+      {
+        type   = "metric",
+        x      = 0,
+        y      = 0,
+        width  = 12,
+        height = 6,
+        properties = {
+          metrics = [
+            ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", aws_ecs_service.app_service.name],
+            [".", "MemoryUtilization", ".", ".", ".", "."]
+          ],
+          period = 300,
+          stat   = "Average",
+          region = var.aws_region,
+          title  = "ECS Service CPU & Memory Utilization"
+        }
+      },
+      # Widget 2: ALB Requests & 5xx Errors
+      {
+        type   = "metric",
+        x      = 12,
+        y      = 0,
+        width  = 12,
+        height = 6,
+        properties = {
+          metrics = [
+            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.main.arn_suffix],
+            [".", "HTTPCode_Target_5XX_Count", ".", ".", { "stat": "Sum" }]
+          ],
+          period = 300,
+          stat   = "Sum",
+          region = var.aws_region,
+          title  = "ALB Requests & 5xx Errors"
+        }
+      },
+      # Widget 3: Container Logs
+      {
+        type   = "log",
+        x      = 0,
+        y      = 7,
+        width  = 24,
+        height = 6,
+        properties = {
+          region = var.aws_region,
+          title  = "ECS Container Logs",
+          #query  = "SOURCE '${aws_cloudwatch_log_group.app_logs.name}' | fields @timestamp, @message | sort @timestamp desc | limit 20"
+          query = "SOURCE '${aws_cloudwatch_log_group.app_logs.name}' | fields @timestamp, @message | filter @message not like /GET \\/health/ and @message not like /ELB-HealthChecker/ | sort @timestamp desc | limit 200"
+        }
+      }
+    ]
+  })
+}
 
 
-# 12. Outputs
+# Add this new policy resource
+resource "aws_iam_policy" "ecs_cloudwatch_logs_policy" {
+  name        = "${local.base_name}-ecs-logs-policy"
+  description = "Allows ECS instances to write to CloudWatch Logs"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*" # You can restrict this to the log group ARN for more security
+      }
+    ]
+  })
+}
+
+# Now, attach this policy to your existing instance role
+resource "aws_iam_role_policy_attachment" "ecs_logs_policy_attachment" {
+  role       = aws_iam_role.ecs_instance_role.name
+  policy_arn = aws_iam_policy.ecs_cloudwatch_logs_policy.arn
+}
+
+# Outputs
 # This will print the public URL of your application after 'terraform apply' completes.
 output "application_url" {
   description = "The URL of the deployed application"
