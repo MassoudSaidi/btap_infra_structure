@@ -291,8 +291,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = "app"
-      image     = "docker.io/massoudsaidi/massoud_btap_1:v3.0.1" # Specific, correct image
-      # image     = "docker.io/massoudsaidi/surrogate_model_1:v3.0.3"
+      image     = "docker.io/hajirh/surrogate_model_app:v1.0.0" # Specific, correct image            
       essential = true
       portMappings = [{
         containerPort = 8000
@@ -329,11 +328,11 @@ resource "aws_ecs_task_definition" "app" {
   # even if the live version in AWS is different from the code."
   # Ignores definition revision made by CI/CD pipeline.
   # --- TEMPORARILY COMMENT THIS OUT TO APPLY THE ANY IMPORTANT CHNAGES LIKE MEMORY CHANGE --- important when: terraform taint aws_ecs_task_definition.app
-  lifecycle {
-    ignore_changes = [
-      container_definitions,
-    ]
-  }  
+  # lifecycle {
+  #   ignore_changes = [
+  #     container_definitions,
+  #   ]
+  # }  
 }
 
 # 11. ECS Service
@@ -367,12 +366,12 @@ resource "aws_ecs_service" "app_service" {
   ]
 
   # Ignores definition revision made by CI/CD pipeline.
-  lifecycle {
-    ignore_changes = [
-      task_definition,
-      #   create_before_destroy = true # Prevents deployment deadlocks  
-    ]
-  }  
+  # lifecycle {
+  #   ignore_changes = [
+  #     task_definition,
+  #     #   create_before_destroy = true # Prevents deployment deadlocks  
+  #   ]
+  # }  
 }
 
 # 12. CLOUDWATCH ALARMS
