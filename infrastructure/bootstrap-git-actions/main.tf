@@ -109,49 +109,49 @@ resource "github_actions_secret" "ecs_task_family" {
 resource "github_actions_secret" "cognito_region" {
   repository      = var.github_repo
   secret_name     = "COGNITO_REGION"
-  plaintext_value = "ca-central-1"
+  plaintext_value = var.cognito_region
 }
 
 resource "github_actions_secret" "cognito_user_pool_id" {
   repository      = var.github_repo
   secret_name     = "COGNITO_USER_POOL_ID"
-  plaintext_value = "ca-central-1_jkcyFtg8t"
+  plaintext_value = var.cognito_user_pool_id
 }
 
 resource "github_actions_secret" "cognito_app_client_id" {
   repository      = var.github_repo
   secret_name     = "COGNITO_APP_CLIENT_ID"
-  plaintext_value = "4osa36mkhu8f2f70gfao9kus1t"
+  plaintext_value = var.cognito_app_client_id
 }
 
 resource "github_actions_secret" "cognito_app_public_client_id" {
   repository      = var.github_repo
   secret_name     = "COGNITO_APP_PUBLIC_CLIENT_ID"
-  plaintext_value = "407500nv5olochli5duupnv47a"
+  plaintext_value = var.cognito_app_public_client_id
 }
 
 resource "github_actions_secret" "cognito_app_client_secret" {
   repository      = var.github_repo
   secret_name     = "COGNITO_APP_CLIENT_SECRET"
-  plaintext_value = "a4vrk8lco6nuicgsbvjovu08d3ic14vaequf2tkh21ijauhsol3"
+  plaintext_value = var.cognito_app_client_secret
 }
 
 resource "github_actions_secret" "cognito_domain" {
   repository      = var.github_repo
   secret_name     = "COGNITO_DOMAIN"
-  plaintext_value = "https://btap-identity-dev-auth.auth.ca-central-1.amazoncognito.com"
+  plaintext_value = var.cognito_domain
 }
 
 resource "github_actions_secret" "app_base_url" {
   repository      = var.github_repo
   secret_name     = "APP_BASE_URL"
-  plaintext_value = "http://btap-app4-dev-alb-1261227763.ca-central-1.elb.amazonaws.com"
+  plaintext_value = var.app_base_url
 }
 
 resource "github_actions_secret" "version_string" {
   repository      = var.github_repo
   secret_name     = "VERSION_STRING"
-  plaintext_value = "v1.3.0"
+  plaintext_value = var.version_string
 }
 
 
