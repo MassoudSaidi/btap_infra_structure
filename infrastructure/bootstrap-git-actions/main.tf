@@ -85,19 +85,19 @@ resource "github_actions_secret" "docker_password" {
 resource "github_actions_secret" "ecs_cluster_name" {
   repository      = var.github_repo
   secret_name     = "ECS_CLUSTER_NAME"
-  plaintext_value = "btap-app4-dev-cluster"
+  plaintext_value = var.ecs_cluster_name
 }
 
 resource "github_actions_secret" "ecs_service_name" {
   repository      = var.github_repo
   secret_name     = "ECS_SERVICE_NAME"
-  plaintext_value = "btap-app4-dev-service"
+  plaintext_value = var.ecs_service_name
 }
 
 resource "github_actions_secret" "ecs_task_family" {
   repository      = var.github_repo
   secret_name     = "ECS_TASK_FAMILY"
-  plaintext_value = "btap-app4-dev-task"
+  plaintext_value = var.ecs_task_family
 }
 
 # -----------------
