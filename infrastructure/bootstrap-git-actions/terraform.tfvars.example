@@ -1,12 +1,16 @@
+# Developer name
+# Could be any name (it's just used for local state management)
+# Allowed Characters: Alphanumeric characters (a-z, A-Z, 0-9) and the symbols +, =, ,, ., @, _, -.
+developer_name = "Hajir"
+
 # Docker
-docker_username = "massoudsaidi"
+docker_username = "Hajir H"
 docker_password = "CHANGE_ME_DOCKER_PASSWORD"
 
 # GitHub
 github_token = "CHANGE_ME_GITHUB_TOKEN"
-github_owner = "MassoudSaidi"
-# github_repo  = "surrogateModel_1"   # use lowercase repo name
-github_repo  = "massoud_btap_1"   # use lowercase repo name
+github_owner = "Hajir H"
+github_repo  = "surrogateModel_1"   # use lowercase repo name
 
 # Deployment configuration values that tell GitHub Actions workflow which ECS resources to update.
 ecs_cluster_name = "btap-app4-dev-cluster"

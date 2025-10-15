@@ -13,17 +13,23 @@ provider "github" {
   owner = var.github_owner
 }
 
-# AWS Provider
-provider "aws" {
-  # region     = var.aws_region
-  region      = var.aws_region 
+# # AWS Provider
+# provider "aws" {
+#   region      = var.aws_region 
+# }
+
+locals {
+  # Sanitize the GitHub owner name to be safe for use in AWS resource names
+  safe_developer_name = lower(replace(var.developer_name, " ", "-"))
 }
+
 
 # -----------------
 # Create AWS IAM User for GitHub Actions
 # -----------------
 resource "aws_iam_user" "gha_user" {
-  name = "github-actions-deployer"
+  # name = "github-actions-deployer"
+  name = "${local.safe_developer_name}-github-actions-deployer"
 }
 
 resource "aws_iam_user_policy_attachment" "ecs_access" {

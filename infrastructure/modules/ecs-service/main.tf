@@ -1,7 +1,16 @@
 # Configure the AWS Provider
-provider "aws" {
-  region = "ca-central-1"
-}
+# provider "aws" {
+#   region = "ca-central-1"
+#   profile = "dev"
+
+#   # profile = "sso-profile-name"  # replace with the AWS CLI SSO profile
+
+#   # This IAM user must have permission to assume the role
+#   # assume_role {
+#   #   role_arn     = "arn:aws:iam::866134557891:role/service-role/staging-terraform_deployer" # <-- replace this with the output of the python script creating the role
+#   #   session_name = "TerraformSession"
+#   # }  
+# }
 
 # 1. VPC and Networking using a standard module
 module "vpc" {
@@ -214,10 +223,15 @@ resource "aws_lb" "main" {
 
 resource "aws_lb_target_group" "app" {
   name        = local.names.target_group_name
-  port        = 80
+  # name = "${local.names.target_group_name}-${substr(md5(terraform.workspace), 0, 6)}"
+  port        = 8000
   protocol    = "HTTP"
   vpc_id      = module.vpc.vpc_id
   target_type = "instance"    
+  
+  lifecycle {
+    create_before_destroy = true
+  }  
 
   health_check {
     path = "/health" # Correct health check path
@@ -245,20 +259,23 @@ resource "aws_lb_listener" "http" {
 # A. ElastiCache Subnet Group
 # This tells ElastiCache which private subnets it can live in.
 resource "aws_elasticache_subnet_group" "redis_subnet_group" {
-  name       = "redis-subnet-group"
+  # name       = "redis-subnet-group"
+  name       = "${local.base_name}-redis-subnet-group"
   # IMPORTANT: Use the private subnets from your VPC module
   subnet_ids = module.vpc.private_subnets
 }
 
 # B. ElastiCache Parameter Group (can be copied as-is)
 resource "aws_elasticache_parameter_group" "redis7" {
-  name   = "redis7-param-group"
+  # name   = "redis7-param-group"
+  name   = "${local.base_name}-redis7-param-group"
   family = "redis7"
 }
 
 # C. The ElastiCache Redis Cluster Itself
 resource "aws_elasticache_cluster" "redis" {
-  cluster_id           = "redis-prod-cluster"
+  # cluster_id           = "redis-prod-cluster"
+  cluster_id           = "${local.base_name}-redis-cluster"
   engine               = "redis"
   engine_version       = "7.0"
   node_type            = "cache.t3.micro"
@@ -291,7 +308,8 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = "app"
-      image     = "docker.io/hajirh/surrogate_model_app:v1.0.0" # Specific, correct image            
+      # image     = "docker.io/hajirh/surrogate_model_app:v1.0.0" # Specific, correct image            
+      image     = "docker.io/massoudsaidi/massoud_btap_1:4.0.5" # Specific, correct image            
       essential = true
       portMappings = [{
         containerPort = 8000
@@ -318,7 +336,15 @@ resource "aws_ecs_task_definition" "app" {
         {
           name = "REDIS_PORT"
           value = "6379"
-        }
+        },
+        { name = "APP_BASE_URL",   value = "http://${aws_lb.main.dns_name}" },
+        { name = "COGNITO_APP_CLIENT_ID",            value = "4osa36mkhu8f2f70gfao9kus1t" },
+        { name = "COGNITO_APP_PUBLIC_CLIENT_ID",     value = "407500nv5olochli5duupnv47a" },
+        { name = "COGNITO_DOMAIN",                   value = "https://btap-identity-dev-auth.auth.ca-central-1.amazoncognito.com" },
+        { name = "COGNITO_REGION",                   value = var.aws_region },
+        { name = "COGNITO_USER_POOL_ID",             value = "ca-central-1_jkcyFtg8t" },
+        { name = "COGNITO_APP_CLIENT_SECRET",        value = "a4vrk8lco6nuicgsbvjovu08d3ic14vaequf2tkh21ijauhsol3" },
+        { name = "VERSION_STRING",                   value = "v1.9.0" }        
       ]
       # --- END ADD ---      
     }

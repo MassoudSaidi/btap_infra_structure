@@ -1,3 +1,18 @@
+# # Configure the AWS Provider
+# provider "aws" {
+#   region = "ca-central-1"
+
+#   # profile = "sso-profile-name"  # replace with the AWS CLI SSO profile
+
+#   # This IAM user must have permission to assume the role
+#   # assume_role {
+#   #   role_arn     = "arn:aws:iam::866134557891:role/service-role/staging-terraform_deployer" # <-- replace this with the output of the python script creating the role
+#   #   session_name = "TerraformSession"
+#   # }  
+# }
+
+
+
 # Use variables for environment-specific values
 variable "app_name" {
   description = "The name of the application."
@@ -14,25 +29,25 @@ variable "app_environment" {
 variable "cognito_callback_urls" {
   description = "A list of allowed callback URLs for the Cognito app client."
   type        = list(string)
-  default     = ["http://localhost:3000/auth/callback"]
+  default     = ["http://localhost:8000/auth/callback"]
 }
 
 variable "cognito_logout_urls" {
   description = "A list of allowed logout URLs for the Cognito app client."
   type        = list(string)
-  default     = ["http://localhost:3000/logout"]
+  default     = ["http://localhost:8000/logout"]
 }
 
 variable "cognito_public_callback_urls" {
   description = "A list of allowed callback URLs for the Cognito public app."
   type        = list(string)
-  default     = ["https://oauth.pstmn.io/v1/callback", "http://localhost:3000/docs/oauth2-redirect"]
+  default     = ["https://oauth.pstmn.io/v1/callback", "http://localhost:8000/docs/oauth2-redirect"]
 }
 
 variable "cognito_public_logout_urls" {
   description = "A list of allowed logout URLs for the Cognito app client."
   type        = list(string)
-  default     = ["http://localhost:3000/docs"]
+  default     = ["http://localhost:8000/docs"]
 }
 
 # Create a unique domain name
@@ -211,9 +226,12 @@ output "public_client_id" {
 output "client_secret" {
   description = "The Client Secret for the Cognito App Client. This is a sensitive value."
   value       = aws_cognito_user_pool_client.app.client_secret
-  # sensitive   = true # This is CRITICAL for security.
+  sensitive   = true # This is CRITICAL for security.
 }
 
+
+data "aws_region" "current" {}
 output "domain" {
-  value = aws_cognito_user_pool_domain.domain.domain
+  # value = aws_cognito_user_pool_domain.domain.domain
+  value = "https://${aws_cognito_user_pool_domain.domain.domain}.auth.${data.aws_region.current.id}.amazoncognito.com"
 }

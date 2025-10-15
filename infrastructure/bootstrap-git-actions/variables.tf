@@ -18,6 +18,13 @@ variable "aws_region" {
 }
 
 # Docker Credentials
+variable "developer_name" {
+  description = "Could be any name (it's just used for local state management)"
+  type        = string
+}
+
+
+# Docker Credentials
 variable "docker_username" {
   description = "Docker registry username"
   type        = string
